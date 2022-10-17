@@ -237,7 +237,7 @@ def generateReport(sortedList: list):
 
 
 #Runs the application. Insert token here
-client.run('MTAyNjg5NzA5OTc1NDgzMjA0Ng.GkUd-_.5cdC2HUJPGCK0cENJ92oqDHg-MmRwsoo-NMzok')
+client.run('')
 
 
 """TODO:    promotion voting
