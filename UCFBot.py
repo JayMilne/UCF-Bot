@@ -49,46 +49,108 @@ async def induct(interaction:discord.Interaction, inductee:discord.User, steamna
     print("Inducted member: " + str(inductee) + " by: " + str(interaction.user))
 
 
-""" /startvote initialises votes (maybe unneeded?)
-    add /votes in one by one. they save their message id to a list
-    /endvote tallys votes for all voted members, promotes them and prints list of promotees
-
-    """
 #Global variable for communicating between votes
 voteList = []
 
 
-@tree.command(name = "startvoting", description = "Starts the promotion voting. Officer use only")
-@discord.app_commands.checks.has_any_role("Officer")
-async def startvoting(interaction:discord.Interaction):
-    pass
-
-
-@tree.command(name = "vote", description = "Starts a promotion vote for a member")
+#Starts promotion vote for a member. Checks if user has basic training. NCO+ promotion only possible by Officers, NCO's can do enlisted promotions
+@tree.command(name = "vote", description = "Starts a promotion vote for a member. Only officers can promote to NCO+")
 @discord.app_commands.checks.has_any_role("NCO", "Officer")
 async def vote(interaction:discord.Interaction, promotee:discord.User, rank:discord.Role):
     guild = interaction.guild
-    if promotee.roles[-1] == discord.utils.get(guild.roles, name='Private'):
-        if discord.utils.get(guild.roles, name='Basic Training Complete') in promotee.roles:
-            pass
-        else:
-            await interaction.response.send_message(promotee.mention + " does not have basic training!")
-            return
-    await interaction.response.send_message(promotee.mention + " to " + rank.mention)
-    voteMessage = await interaction.original_response()
-    await voteMessage.add_reaction("✅")
-    await voteMessage.add_reaction("❌")
-    voteList.append(voteMessage)
 
+    #Initialising variables
+    ncoPromotionList = ['Recruit', 'Private', 'Veteran', 'Legionnaire']
+
+    #Checks if user has access level to start the vote
+    if rank.name in ncoPromotionList or discord.utils.get(guild.roles, name='Officer') in interaction.user.roles:
+        #Checks user has basic training if being promoted from private
+        if promotee.roles[-1] == discord.utils.get(guild.roles, name='Private'):
+            if discord.utils.get(guild.roles, name='Basic Training Complete') in promotee.roles:
+                pass
+            else:
+                await interaction.response.send_message(promotee.mention + " does not have basic training!")
+                return 
+        
+        #Prints message of user to be voted for, and adds emojis for voting
+        await interaction.response.send_message(promotee.mention + " to " + rank.mention)
+        voteMessage = await interaction.original_response()
+        await voteMessage.add_reaction("✅")
+        await voteMessage.add_reaction("❌")
+
+        #Adds vote to list to be used in endVoting function
+        voteList.append([voteMessage, promotee, rank])
+
+
+#Promotes members that have been voted on and sends a list of promotees to be put in announcements. Only officers can use this
 @tree.command(name = "endvoting", description = "Promotes members that have been voted on and sends a list of promotees. Officer use only")
 @discord.app_commands.checks.has_any_role("Officer")
 async def endvoting(interaction:discord.Interaction):
     guild = interaction.guild
-    print (voteList[0]) #dont work bossman, need fixed
-    voteList[0] = discord.utils.get(voteList[0].id)
-    print(voteList[0].reactions)
+    await interaction.response.defer()
 
+    #Initialising variables
+    promoteeList = []
+    prefixDict = {'Recruit': '[UCF', 'Private': '+[UCF', 'Veteran': '++[UCF', 'Legionnaire': '+++[UCF',
+                  'Pioneer': '*[UCF☆', 'Lance Corporal': '*[UCF☆', 'Corporal': '*[UCF☆', 'Assistant Quartermaster': '**[UCF☆', 'Sergeant': '*[UCF☆', 'First Sergeant': '*[UCF☆', 'Sergeant Major': '*[UCF☆',
+                  'Officer Cadet': '**[UCF★', 'Second Lieutenant': '**[UCF★', 'Lieutenant': '**[UCF★', 'Captain': '**[UCF★', 'Commodore': '**[UCF★', 'Quartermaster': '**[UCF★',
+                  'Sub-Commander': '***[UCF★', 'Commander': '***[UCF★', 'Supreme Commander': '***[UCF★'}
 
+    #Setting nickname of sucsessful promotees. Adds promotees to list for printing
+    for vote in voteList:
+        #Refreshing vote message so the bot knows about reactions taken place after initial recording of the message. Doesnt update if message was deleted
+        try:
+            vote[0] = await vote[0].fetch()
+        except:
+            print("Failed due to message being deleted")
+
+        #Checks if yes votes outnumber no votes
+        if vote[0].reactions[0].count > vote[0].reactions[1].count:
+            #Adds promotee to list for later use
+            promotee = (vote[1], vote[2])
+            promoteeList.append(promotee)
+
+            #Changes nickname
+            splitNick = list(vote[1].nick)
+            for char in list(splitNick):
+                if not char == ']':
+                    splitNick.remove(char)
+                else:
+                    break
+            suffixNick = ''.join(splitNick)
+            await vote[1].edit(nick = prefixDict[vote[2].name] + suffixNick)
+
+    #Prints list of promotees, with ranks seperating themm
+    promoteeDict = dict(promoteeList)
+    sortedList = sortMemberSet(set([row[0] for row in promoteeList]))
+    response = ""
+    previousRank = ''
+    for promotee in sortedList:
+        if not promoteeDict[promotee] == previousRank:
+            response = response + "\n" + promoteeDict[promotee].mention + "\n\n"
+
+        response = response + promotee.mention + "\n"
+        previousRank = promoteeDict[promotee]
+
+    await interaction.followup.send(response)
+
+    #Updates roles
+    for promotee in promoteeList:
+        #Removes previous rank, adds new
+        await promotee[0].remove_roles(promotee[0].roles[-1], reason="Promoted via vote by UCF Bot")
+        await promotee[0].add_roles(promotee[1], reason="Promoted via vote by UCF Bot")
+
+        #Gives NCO role
+        if promotee[1].name == 'Lance Corporal':
+            await promotee[0].add_roles(discord.utils.get(guild.roles, name='NCO'), reason="Promoted via vote by UCF Bot")
+        #Gives Officer role
+        if promotee[1].name == 'Officer Cadet':
+            await promotee[0].add_roles(discord.utils.get(guild.roles, name='Officer'), reason="Promoted via vote by UCF Bot")
+            await promotee[0].remove_roles(discord.utils.get(guild.roles, name='NCO'), reason="Promoted via vote by UCF Bot")
+            
+    #Clears list
+    voteList.clear()
+    
 
 #Takes a snapshot of training channel and gives all members basic training complete roles. Also sends list of trainees for pasting into report
 @tree.command(name = "basictraining", description = "Gives all trainees basic training role. Also prints list of trainees")
@@ -193,7 +255,7 @@ def sortMemberSet(memberSet:set):
 
     #Adding all members nicknames to a dictionary against their ID. This is so the ID can be reaquirred after sorting by nickname
     for member in memberList:
-        if member.bot == False:
+        if member.bot == True:  #CHANGE MEE
             nickList.append(member.nick)
             addPair = {member.nick: member}
             memberDict.update(addPair)
@@ -237,10 +299,10 @@ def generateReport(sortedList: list):
 
 
 #Runs the application. Insert token here
-client.run('')
+client.run('MTAyNjg5NzA5OTc1NDgzMjA0Ng.GljsLt.mtjyKQnC9Shqss621NQ_u-XjjsKiW6Qwjbgilw')
 
 
-"""TODO:    promotion voting
+"""TODO:
             operation end promoting
             rank structure updating
 
@@ -249,6 +311,7 @@ client.run('')
 
             error handling
             profile picture update
+            fix possible vulnerability in officer being used not as an ID but just a name
 
             logging
             data analysis
