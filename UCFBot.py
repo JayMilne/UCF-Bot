@@ -299,7 +299,7 @@ def generateReport(sortedList: list):
 
 
 #Runs the application. Insert token here
-client.run('MTAyNjg5NzA5OTc1NDgzMjA0Ng.GljsLt.mtjyKQnC9Shqss621NQ_u-XjjsKiW6Qwjbgilw')
+client.run('')
 
 
 """TODO:
