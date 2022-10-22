@@ -110,24 +110,23 @@ async def endvoting(interaction:discord.Interaction):
         #Refreshing vote message so the bot knows about reactions taken place after initial recording of the message. Doesnt update if message was deleted
         try:
             vote[0] = await vote[0].fetch()
+            #Checks if yes votes outnumber no votes
+            if vote[0].reactions[0].count > vote[0].reactions[1].count:
+                #Adds promotee to list for later use
+                promotee = (vote[1], vote[2])
+                promoteeList.append(promotee)
+
+                #Changes nickname
+                splitNick = list(vote[1].nick)
+                for char in list(splitNick):
+                    if not char == ']':
+                        splitNick.remove(char)
+                    else:
+                        break
+                suffixNick = ''.join(splitNick)
+                await vote[1].edit(nick = prefixDict[vote[2].name] + suffixNick)
         except:
-            print("Failed due to message being deleted")    #TODO: This doesnt stop the error however
-
-        #Checks if yes votes outnumber no votes
-        if vote[0].reactions[0].count > vote[0].reactions[1].count:
-            #Adds promotee to list for later use
-            promotee = (vote[1], vote[2])
-            promoteeList.append(promotee)
-
-            #Changes nickname
-            splitNick = list(vote[1].nick)
-            for char in list(splitNick):
-                if not char == ']':
-                    splitNick.remove(char)
-                else:
-                    break
-            suffixNick = ''.join(splitNick)
-            await vote[1].edit(nick = prefixDict[vote[2].name] + suffixNick)
+            print("Failed due to message being deleted!")
 
     #Prints list of promotees, with ranks seperating themm
     promoteeDict = dict(promoteeList)
@@ -145,6 +144,9 @@ async def endvoting(interaction:discord.Interaction):
 
     #Updates roles
     for promotee in promoteeList:
+        #Avoids getting rate limited
+        await asyncio.sleep(0.5)
+
         #Removes previous rank, adds new
         await promotee[0].remove_roles(promotee[0].roles[-1], reason="Promoted via vote by UCF Bot")
         await promotee[0].add_roles(promotee[1], reason="Promoted via vote by UCF Bot")
@@ -253,7 +255,7 @@ async def basictraining(interaction:discord.Interaction):
     trainingComplete = discord.utils.get(guild.roles, name='Basic Training Complete')
     trainingNotComplete = discord.utils.get(guild.roles, name='Basic Training Not Complete')
     for trainee in sortedList:
-        await asyncio.sleep(1) #Avoids getting rate limited
+        await asyncio.sleep(0.5) #Avoids getting rate limited
         await trainee.add_roles(trainingComplete, reason="Added by UCF Bot")
         await trainee.remove_roles(trainingNotComplete, reason="Removed by UCF Bot")
 
@@ -298,7 +300,7 @@ async def operationstart(interaction:discord.Interaction):
         #Adds all members of operation voice channels to the attendees list (memberSet)
         operationVoiceChannels = ['Briefing Room','War Room','Infantry Squad 1','Infantry Squad 2','Steel Legion','Artillery Coolkids','Combat Engineers','Logistics 1','Logistics 2','Facility']
         for channel in operationVoiceChannels:
-            await asyncio.sleep(1) #Avoids getting rate limited
+            await asyncio.sleep(0.5) #Avoids getting rate limited
             for member in discord.utils.get(guild.voice_channels, name=channel).members:
                 memberSet.add(member)
 
@@ -310,16 +312,34 @@ async def operationstart(interaction:discord.Interaction):
 @tree.command(name = "operationend", description = "Sends a sorted list of operation attendees to put into the report. Also promotes recruits to private") 
 @discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
 async def operationend(interaction:discord.Interaction):
+    guild = interaction.guild
     await interaction.response.defer()
 
     #Sets operation to be finished
     global operationStatus
     operationStatus = False
 
-    #Prints out attendee list
+    #Sorts attendees
     sortedList = sortMemberSet(memberSet)
-    await interaction.followup.send("**Attendees (" + str(len(sortedList)) + "):\n\n**" + generateReport(sortedList))
-    memberSet.clear()     
+    memberSet.clear()  
+
+    #Creates list of recruits to be promoted
+    promoteList = []
+    for member in sortedList:
+        if member.roles[-1].name == "Recruit":
+            promoteList.append(member)
+    
+    #Prints out attendee list
+    recruit = discord.utils.get(guild.roles, name='Recruit')
+    private = discord.utils.get(guild.roles, name='Private')
+    await interaction.followup.send("**Attendees (" + str(len(sortedList)) + "):\n\n**" + generateReport(sortedList) + "\n" + recruit.mention + " to " + private.mention + ":\n\n" + generateReport(promoteList))
+
+    #Promotes recruits
+    for promotee in promoteList:
+        await promotee.edit(nick="+" + promotee.nick)
+        await asyncio.sleep(0.5) #Avoids getting rate limited
+        await promotee.add_roles(private, reason="After Op Promotion")
+        await promotee.remove_roles(recruit, reason="After Op Promotion")   
 
     print("Operation ended by: " + str(interaction.user))
 
@@ -336,7 +356,7 @@ def sortMemberSet(memberSet:set):
 
     #Adding all members nicknames to a dictionary against their ID. This is so the ID can be reaquirred after sorting by nickname
     for member in memberList:
-        if member.bot ==  False:
+        if member.bot == False:
             nickList.append(member.nick)
             addPair = {member.nick: member}
             memberDict.update(addPair)
@@ -384,14 +404,11 @@ client.run('')
 
 
 """TODO:
-            operation end promoting
-
             auto assign
             welcome message
             let user add rank roles to avoid having to touch the code
 
             error handling
-            robustness
 
             print comfirmation messages for all functions
             logging
