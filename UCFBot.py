@@ -20,9 +20,15 @@ client = aclient()
 tree = app_commands.CommandTree(client)
 
 
+#Global ID's for officers in both UCF and Test server. 
+#This is to remove the vunrability of an NCO creating a new role called 'Officer' and giving it to themselves. Not done for NCO as enlisted can't alter roles anyway
+UCFOfficer = 487335479042375701
+TestOfficer = 1026948837073494037
+
+
 #Inducts a member into the clan via giving the appropriate roles and changing their nickname
 @tree.command(name = "induct", description = "Inducts a member into the clan")
-@discord.app_commands.checks.has_any_role("NCO", "Officer")
+@discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
 async def induct(interaction:discord.Interaction, inductee:discord.User, steamname:str):
     guild = interaction.guild
     await interaction.response.defer()
@@ -55,7 +61,7 @@ voteList = []
 
 #Starts promotion vote for a member. Checks if user has basic training. NCO+ promotion only possible by Officers, NCO's can do enlisted promotions
 @tree.command(name = "vote", description = "Starts a promotion vote for a member. Only officers can promote to NCO+")
-@discord.app_commands.checks.has_any_role("NCO", "Officer")
+@discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
 async def vote(interaction:discord.Interaction, promotee:discord.User, rank:discord.Role):
     guild = interaction.guild
 
@@ -63,7 +69,7 @@ async def vote(interaction:discord.Interaction, promotee:discord.User, rank:disc
     ncoPromotionList = ['Recruit', 'Private', 'Veteran', 'Legionnaire']
 
     #Checks if user has access level to start the vote
-    if rank.name in ncoPromotionList or discord.utils.get(guild.roles, name='Officer') in interaction.user.roles:
+    if rank.name in ncoPromotionList or discord.utils.get(guild.roles, id = UCFOfficer) in interaction.user.roles or discord.utils.get(guild.roles, id = TestOfficer) in interaction.user.roles:
         #Checks user has basic training if being promoted from private
         if promotee.roles[-1] == discord.utils.get(guild.roles, name='Private'):
             if discord.utils.get(guild.roles, name='Basic Training Complete') in promotee.roles:
@@ -81,10 +87,13 @@ async def vote(interaction:discord.Interaction, promotee:discord.User, rank:disc
         #Adds vote to list to be used in endVoting function
         voteList.append([voteMessage, promotee, rank])
 
+    else:
+        await interaction.response.send_message("You do not have the permissions to promote a member to that rank. Requires: Officer")
+    
 
 #Promotes members that have been voted on and sends a list of promotees to be put in announcements. Only officers can use this
 @tree.command(name = "endvoting", description = "Promotes members that have been voted on and sends a list of promotees. Officer use only")
-@discord.app_commands.checks.has_any_role("Officer")
+@discord.app_commands.checks.has_any_role(UCFOfficer, TestOfficer)
 async def endvoting(interaction:discord.Interaction):
     guild = interaction.guild
     await interaction.response.defer()
@@ -102,7 +111,7 @@ async def endvoting(interaction:discord.Interaction):
         try:
             vote[0] = await vote[0].fetch()
         except:
-            print("Failed due to message being deleted")
+            print("Failed due to message being deleted")    #TODO: This doesnt stop the error however
 
         #Checks if yes votes outnumber no votes
         if vote[0].reactions[0].count > vote[0].reactions[1].count:
@@ -150,11 +159,83 @@ async def endvoting(interaction:discord.Interaction):
             
     #Clears list
     voteList.clear()
+
+    #Updates rank structure
+    await editRankStructure(interaction)
     
+
+#Updates the rank structure. Can create a new message, or update the old one
+@tree.command(name = "updaterankstructure", description = "Manually updates/prints the rank structure. Automatically done after every meeting")
+@discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
+async def updaterankstructure(interaction:discord.Interaction, newmessage: bool):
+    guild = interaction.guild
+
+    #Checks for if a new message is wanted, or the old one should be updated
+    if newmessage == True:
+        #Sends message in same channel that the interaction took place
+        message = await interaction.channel.send(await generateRankStructure(interaction))
+
+        #Saves the message to a txt file as a string
+        with open('rank_structure_message.txt', 'w') as file:
+            file.write(str(message))
+    else:
+        #Edits message stored in the rank structure file
+        await editRankStructure(interaction)
+
+        #Sends confirmation message
+        await interaction.response.send_message("Successfully Updated!")
+
+
+#Edits the rank structure message. Can be called manually using above function, or can be called automatically
+async def editRankStructure(interaction):
+    guild = interaction.guild
+
+    #Initialising variables
+    message = ""
+
+    #Reads from rank structure file
+    with open('rank_structure_message.txt', 'r') as file:
+        #Gets message via converting the string stored inside the file into a message object
+        messageString = file.readline()
+        messageSplitString = messageString.split(" ") 
+        channel = await guild.fetch_channel(messageSplitString[3].lstrip("id="))
+        message = await channel.fetch_message(messageSplitString[1].lstrip("id="))
+
+    #Updates message
+    await message.edit(content = await generateRankStructure(interaction))
+
+
+#Generates the rank structure message
+async def generateRankStructure(interaction):
+    guild = interaction.guild
+
+    #Initialising variables
+    rankStructure = ""
+    rankList = ["Supreme Commander", "Commander", "Sub-Commander", "Quartermaster", "Commodore", "Captain", "Lieutenant", "Second Lieutenant", "Officer Cadet", "Sergeant Major", "First Sergeant", "Sergeant", "Assistant Quartermaster", "Corporal", "Lance Corporal"]
+    capacityDict = {'Pioneer': '*N/A*', 'Lance Corporal': '*8 Slots*', 'Corporal': '*6 Slots*', 'Assistant Quartermaster': '*4 Slots*', 'Sergeant': '*2 Slots*', 'First Sergeant': '*2 Slots*', 'Sergeant Major': '*1 Slot*',
+                   'Officer Cadet': '*Trial Rank*', 'Second Lieutenant': '*2 Slots*', 'Lieutenant': '*2 Slots*', 'Captain': '*2 Slots*', 'Commodore': '*1 Slot*', 'Quartermaster': '*1 Slot*',
+                   'Sub-Commander': '*Reserve*', 'Commander': '*1 Slot*', 'Supreme Commander': '*1 Slot*'}
+    
+    #Runs for every NCO+ rank
+    for rank in rankList:
+        #Adds line of mentioned rank and its slots
+        rankID = discord.utils.get(guild.roles, name=rank)
+        memberList = rankID.members
+        rankStructure = rankStructure + "\n\n" + rankID.mention + " - " + capacityDict[rank] + " - "
+
+        #Adds sorted list of all members of the rank. If there is no members, adds 'Empty!'
+        if memberList:
+            sortedMemberList = sortMemberSet(set(memberList))
+            for member in sortedMemberList:
+                rankStructure = rankStructure + member.mention + " "
+        else:
+            rankStructure = rankStructure + "Empty!"   
+    return rankStructure
+
 
 #Takes a snapshot of training channel and gives all members basic training complete roles. Also sends list of trainees for pasting into report
 @tree.command(name = "basictraining", description = "Gives all trainees basic training role. Also prints list of trainees")
-@discord.app_commands.checks.has_any_role("NCO", "Officer")
+@discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
 async def basictraining(interaction:discord.Interaction):
     guild = interaction.guild
     await interaction.response.defer()
@@ -181,7 +262,7 @@ async def basictraining(interaction:discord.Interaction):
 
 #Takes a snapshot of a specifed voice channel and prints it out
 @tree.command(name = "voicesnapshot", description = "Prints a list of all members currently in a specified voice channel")
-@discord.app_commands.checks.has_any_role("NCO", "Officer")
+@discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
 async def voicesnapshot(interaction:discord.Interaction, voicechannel:discord.VoiceChannel):
     guild = interaction.guild
     await interaction.response.defer()
@@ -203,7 +284,7 @@ memberSet = set()
 
 #Records the members that join any operation voice channels. Takes snapshots every minute. Stopped via the operationend command.
 @tree.command(name = "operationstart", description = "Begins recording all members that join an operation")
-@discord.app_commands.checks.has_any_role("NCO", "Officer")
+@discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
 async def operationstart(interaction:discord.Interaction):
     await interaction.response.send_message("Operation Started!")
     print("Operation started by: " + str(interaction.user))
@@ -227,7 +308,7 @@ async def operationstart(interaction:discord.Interaction):
 
 #Ends the operation, prints a list of attendees and promotes all attending recruits to private
 @tree.command(name = "operationend", description = "Sends a sorted list of operation attendees to put into the report. Also promotes recruits to private") 
-@discord.app_commands.checks.has_any_role("NCO", "Officer")
+@discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
 async def operationend(interaction:discord.Interaction):
     await interaction.response.defer()
 
@@ -255,7 +336,7 @@ def sortMemberSet(memberSet:set):
 
     #Adding all members nicknames to a dictionary against their ID. This is so the ID can be reaquirred after sorting by nickname
     for member in memberList:
-        if member.bot == True:  #CHANGE MEE
+        if member.bot ==  False:
             nickList.append(member.nick)
             addPair = {member.nick: member}
             memberDict.update(addPair)
@@ -304,15 +385,15 @@ client.run('')
 
 """TODO:
             operation end promoting
-            rank structure updating
 
             auto assign
             welcome message
+            let user add rank roles to avoid having to touch the code
 
             error handling
-            profile picture update
-            fix possible vulnerability in officer being used not as an ID but just a name
+            robustness
 
+            print comfirmation messages for all functions
             logging
             data analysis
     """
