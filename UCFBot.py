@@ -54,6 +54,16 @@ async def induct(interaction:discord.Interaction, inductee:discord.User, steamna
     await interaction.followup.send('Successfully Inducted: ' + str(inductee.mention))
     print("Inducted member: " + str(inductee) + " by: " + str(interaction.user))
 
+#Error handling
+@induct.error
+async def inductError(interaction: discord.Interaction, error: Exception):
+    #Returns message to user if they do not have permission to use the commmand
+    if isinstance(error, discord.app_commands.errors.MissingAnyRole):
+        await interaction.response.send_message("You are missing the required permissions to use this command. Requires: NCO/Officer")
+    #Prints any other error to console, just as they normally would be
+    else:
+        raise Exception(error)
+
 
 #Global variable for communicating between votes
 voteList = []
@@ -89,7 +99,17 @@ async def vote(interaction:discord.Interaction, promotee:discord.User, rank:disc
 
     else:
         await interaction.response.send_message("You do not have the permissions to promote a member to that rank. Requires: Officer")
-    
+
+#Error handling
+@vote.error
+async def voteError(interaction: discord.Interaction, error: Exception):
+    #Returns message to user if they do not have permission to use the commmand
+    if isinstance(error, discord.app_commands.errors.MissingAnyRole):
+        await interaction.response.send_message("You are missing the required permissions to use this command. Requires: NCO/Officer")
+    #Prints any other error to console, just as they normally would be
+    else:
+        raise Exception(error)
+
 
 #Promotes members that have been voted on and sends a list of promotees to be put in announcements. Only officers can use this
 @tree.command(name = "endvoting", description = "Promotes members that have been voted on and sends a list of promotees. Officer use only")
@@ -165,6 +185,16 @@ async def endvoting(interaction:discord.Interaction):
     #Updates rank structure
     await editRankStructure(interaction)
     
+#Error handling
+@endvoting.error
+async def endvotingError(interaction: discord.Interaction, error: Exception):
+    #Returns message to user if they do not have permission to use the commmand
+    if isinstance(error, discord.app_commands.errors.MissingAnyRole):
+        await interaction.response.send_message("You are missing the required permissions to use this command. Requires: Officer")
+    #Prints any other error to console, just as they normally would be
+    else:
+        raise Exception(error)
+
 
 #Updates the rank structure. Can create a new message, or update the old one
 @tree.command(name = "updaterankstructure", description = "Manually updates/prints the rank structure. Automatically done after every meeting")
@@ -186,6 +216,16 @@ async def updaterankstructure(interaction:discord.Interaction, newmessage: bool)
 
         #Sends confirmation message
         await interaction.response.send_message("Successfully Updated!")
+
+#Error handling
+@updaterankstructure.error
+async def updaterankstructureError(interaction: discord.Interaction, error: Exception):
+    #Returns message to user if they do not have permission to use the commmand
+    if isinstance(error, discord.app_commands.errors.MissingAnyRole):
+        await interaction.response.send_message("You are missing the required permissions to use this command. Requires: NCO/Officer")
+    #Prints any other error to console, just as they normally would be
+    else:
+        raise Exception(error)
 
 
 #Edits the rank structure message. Can be called manually using above function, or can be called automatically
@@ -261,6 +301,16 @@ async def basictraining(interaction:discord.Interaction):
 
     print("Basic training complete for: " + str(sortedList) + " by: " + str(interaction.user))
 
+#Error handling
+@basictraining.error
+async def basictrainingError(interaction: discord.Interaction, error: Exception):
+    #Returns message to user if they do not have permission to use the commmand
+    if isinstance(error, discord.app_commands.errors.MissingAnyRole):
+        await interaction.response.send_message("You are missing the required permissions to use this command. Requires: NCO/Officer")
+    #Prints any other error to console, just as they normally would be
+    else:
+        raise Exception(error)
+
 
 #Takes a snapshot of a specifed voice channel and prints it out
 @tree.command(name = "voicesnapshot", description = "Prints a list of all members currently in a specified voice channel")
@@ -277,6 +327,16 @@ async def voicesnapshot(interaction:discord.Interaction, voicechannel:discord.Vo
     await interaction.followup.send(generateReport(sortedList))
 
     print("Snapshot taken for channel: " + str(voicechannel) + " by: " + str(interaction.user))
+
+#Error handling
+@voicesnapshot.error
+async def voicesnapshotError(interaction: discord.Interaction, error: Exception):
+    #Returns message to user if they do not have permission to use the commmand
+    if isinstance(error, discord.app_commands.errors.MissingAnyRole):
+        await interaction.response.send_message("You are missing the required permissions to use this command. Requires: NCO/Officer")
+    #Prints any other error to console, just as they normally would be
+    else:
+        raise Exception(error)
 
 
 #Global variables for use in communicating between "operationstart" and "operationend" functions
@@ -306,6 +366,16 @@ async def operationstart(interaction:discord.Interaction):
 
         #Waits 1 minute between snapshots as to avoid being rate limited
         await asyncio.sleep(60)
+
+#Error handling
+@operationstart.error
+async def operationstartError(interaction: discord.Interaction, error: Exception):
+    #Returns message to user if they do not have permission to use the commmand
+    if isinstance(error, discord.app_commands.errors.MissingAnyRole):
+        await interaction.response.send_message("You are missing the required permissions to use this command. Requires: NCO/Officer")
+    #Prints any other error to console, just as they normally would be
+    else:
+        raise Exception(error)
 
 
 #Ends the operation, prints a list of attendees and promotes all attending recruits to private
@@ -342,6 +412,16 @@ async def operationend(interaction:discord.Interaction):
         await promotee.remove_roles(recruit, reason="After Op Promotion")   
 
     print("Operation ended by: " + str(interaction.user))
+
+#Error handling
+@operationend.error
+async def operationendError(interaction: discord.Interaction, error: Exception):
+    #Returns message to user if they do not have permission to use the commmand
+    if isinstance(error, discord.app_commands.errors.MissingAnyRole):
+        await interaction.response.send_message("You are missing the required permissions to use this command. Requires: NCO/Officer")
+    #Prints any other error to console, just as they normally would be
+    else:
+        raise Exception(error)
 
 
 #Sorts a set by rank, then alphabetical order. Returns a list
@@ -407,8 +487,6 @@ client.run('')
             auto assign
             welcome message
             let user add rank roles to avoid having to touch the code
-
-            error handling
 
             print comfirmation messages for all functions
             logging
