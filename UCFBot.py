@@ -78,7 +78,182 @@ async def massallocaterole(interaction:discord.Interaction, hasrole: discord.Rol
 async def massallocateroleError(interaction: discord.Interaction, error: Exception):
     await errorHandling(interaction, error, "Officer")
 
+#Prints and sets up reactions for the role auto assign messages
+@tree.command(name = "printautoassignmessages", description = "Prints the auto assign messages and adds reactions")
+@discord.app_commands.checks.has_any_role("NCO", UCFOfficer, TestOfficer)
+async def printautoassignmessages(interaction:discord.Interaction):
+    guild = interaction.guild
 
+    #Initialising file
+    file = open('auto_assign_messages.txt', 'w')
+    file.close()
+    file = open('auto_assign_messages.txt', 'a')
+
+    #Region select section
+
+    #Sends message
+    message = await interaction.channel.send("__**Region Select**__\n" +
+                                   "*Pick the region you are playing from.*\n\n" +
+                                   discord.utils.get(guild.roles, name='EU').mention + " - :flag_gb:\n" +
+                                   discord.utils.get(guild.roles, name='NA').mention + " -  :flag_us:\n" +
+                                   discord.utils.get(guild.roles, name='OCE').mention + " -  :flag_au:\n")
+    
+    #Adds reactions
+    emojiList = ["🇬🇧","🇺🇸","🇦🇺"]
+    for emoji in emojiList:
+        await message.add_reaction(emoji)
+
+    #Writes message to file
+    file.write(str(message.id) + "\n")
+
+    #Training select section
+
+    #Gets custom emojis
+    tank = discord.utils.get(guild.emojis, id=1060025057486852217)
+    bayonet = discord.utils.get(guild.emojis, id=530162571840585778)
+
+    #Delay to seperate messages
+    await asyncio.sleep(8*60)
+
+    #Sends message
+    message = await interaction.channel.send("__**Training Select**__\n" +
+                                   "*Choose which training(s) you are interested in.*\n\n" +
+                                   discord.utils.get(guild.roles, name='Logistic Training').mention + " - 🚚\n" +
+                                   discord.utils.get(guild.roles, name='Armoured Training').mention + " - <:tankbig:1060025057486852217>" + "\n" +
+                                   discord.utils.get(guild.roles, name='Combat Engineer Training').mention + " - 🔨\n" +
+                                   discord.utils.get(guild.roles, name='Artillery Training').mention + " - 💥\n" +
+                                   discord.utils.get(guild.roles, name='Advanced Infantry Training').mention + " - <:foxholebayonet:530162571840585778>\n" +
+                                   discord.utils.get(guild.roles, name='Commando Training').mention + " - 🧨\n" +
+                                   discord.utils.get(guild.roles, name='Facility Training').mention + " - 🏭\n") 
+
+    #Adds reactions
+    emojiList = ["🚚", tank, "🔨", "💥", bayonet,"🧨","🏭"]
+    for emoji in emojiList:
+        await message.add_reaction(emoji)
+
+    #Writes to file
+    file.write(str(message.id) + "\n")
+
+    #Misc select section
+
+    #Delay to seperate messages
+    await asyncio.sleep(8*60)
+
+    #Sends message
+    message = await interaction.channel.send("__**Miscellaneous Select**__\n" +
+                                   "*Other miscellaneous roles to take.*\n\n" +
+                                   discord.utils.get(guild.roles, name='QRF').mention + ": To be notified of urgent events that need an immediate response. - ⚠️\n" +
+                                   discord.utils.get(guild.roles, name='Other Games').mention + ": To be pinged when someone is playing a game outside of Foxhole. - 🏓\n" +
+                                   discord.utils.get(guild.roles, name='Extra Details').mention + ": For more information on game updates and game data. - 🧠\n")
+
+    #Adds reactions
+    emojiList = ["⚠️", "🏓", "🧠"]
+    for emoji in emojiList:
+        await message.add_reaction(emoji)
+
+    #Writes to file, then closes file
+    file.write(str(message.id) + "\n")
+    file.close()
+async def printautoassignmessagesError(interaction: discord.Interaction, error: Exception):
+    await errorHandling(interaction, error, "NCO/Officer")
+
+                                   
+#Handles reaction add events
+@client.event
+async def on_raw_reaction_add(payload):
+    await reactionRoles(payload, True)
+@client.event
+async def on_raw_reaction_remove(payload):
+    await reactionRoles(payload, False)
+
+
+#Adds roles on reaction role auto assign
+async def reactionRoles(payload, add):
+    guild = await client.fetch_guild(payload.guild_id)
+    
+    #Taking values from payload
+    message = payload.message_id
+    emoji = payload.emoji.name
+    #.member doesnt work for role remove, so ID has to be used instead
+    if add == True:
+        member = payload.member
+    
+    else:
+        member = await guild.fetch_member(payload.user_id)
+
+    
+
+    #Initialising file
+    file = open('auto_assign_messages.txt', 'r')
+    idList = file.readlines()
+
+    #Removes new line character from ID
+    for i in range(3):
+        idList[i] = idList[i].replace("\n", "")
+        
+    #Gets custom emojis
+    tank = discord.utils.get(guild.emojis, id=1060025057486852217)
+    bayonet = discord.utils.get(guild.emojis, id=530162571840585778)
+
+    #Timezones section
+    if int(message) == int(idList[0]):
+        if emoji == "🇬🇧":
+            role = discord.utils.get(guild.roles, name='EU')
+            await changeRoles(role, member, add)
+
+        elif emoji == "🇺🇸":
+            role = discord.utils.get(guild.roles, name='NA')
+            await changeRoles(role, member, add)
+
+        elif emoji == "🇦🇺":
+            role = discord.utils.get(guild.roles, name='OCE')
+            await changeRoles(role, member, add)
+
+    #Training section
+    elif int(message) == int(idList[1]):
+        if emoji == "🚚":
+            role = discord.utils.get(guild.roles, name='Logistic Training')
+            await changeRoles(role, member, add)
+        if emoji == "tankbig":
+            role = discord.utils.get(guild.roles, name='Armoured Training')
+            await changeRoles(role, member, add)
+        if emoji == "🔨":
+            role = discord.utils.get(guild.roles, name='Combat Engineer Training')
+            await changeRoles(role, member, add)
+        if emoji == "💥":
+            role = discord.utils.get(guild.roles, name='Artillery Training')
+            await changeRoles(role, member, add)
+        if emoji == "foxholebayonet":
+            role = discord.utils.get(guild.roles, name='Advanced Infantry Training')
+            await changeRoles(role, member, add)
+        if emoji == "🧨":
+            role = discord.utils.get(guild.roles, name='Commando Training')
+            await changeRoles(role, member, add)
+        if emoji == "🏭":
+            role = discord.utils.get(guild.roles, name='Facility Training')
+            await changeRoles(role, member, add)
+
+    #Misc section
+    elif int(message) == int(idList[2]):
+        if emoji == "⚠️":
+            role = discord.utils.get(guild.roles, name='QRF')
+            await changeRoles(role, member, add)
+        if emoji == "🏓":
+            role = discord.utils.get(guild.roles, name='Other Games')
+            await changeRoles(role, member, add)
+        if emoji == "🧠":
+            role = discord.utils.get(guild.roles, name='Extra Details')
+            await changeRoles(role, member, add)
+
+
+#Merges add and remove role functions   
+async def changeRoles(role: discord.Role, member: discord.Member, add: bool):
+    if add == True:
+        await member.add_roles(role, reason = "Auto assign")
+    else:
+        await member.remove_roles(role, reason = "Auto assign")
+
+        
 #Begins the bi-weekly promotions meeting. IMPORTANT: This has not been implemented yet "Prints out the data stored in graphs and numbers", and purges unassinged members that have been inactive since the last meeting (2 weeks)
 @tree.command(name = "startmeeting", description = "Starts the promotions meeting. Prints info and purges unassigned. Officer use only")
 @discord.app_commands.checks.has_any_role(UCFOfficer, TestOfficer)
@@ -698,7 +873,6 @@ client.run('')
 """TODO:
             add leave member robustness
             
-            auto assign
             welcome message
 
             print comfirmation messages for all functions
